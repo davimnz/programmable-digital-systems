@@ -1,2 +1,3 @@
-# eea-25
-Laboratórios da disciplina EEA-25
+# Laboratórios EEA-25
+Aluno: Davi Muniz Vasconcelos <br />
+Curso: COMP
