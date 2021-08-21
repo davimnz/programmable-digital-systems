@@ -83,17 +83,52 @@ UPDATE_COUNTER:
 ;  Subroutine INC_COUNTER
 ;*********************************************************************
 INC_COUNTER:
+	PUSH R17
+
+	LDI  R17, MAX_COUNTER_VALUE
 	INC  R20
-	SWAP R20
-	OUT  PORTD, R20
-	SWAP R20
+	CP   R17, R20
+	BRCS SET_COUNTER_TO_MIN_VALUE
+	
+	CALL SET_PORTD
+
+	POP  R17
+	RET
+
+SET_COUNTER_TO_MIN_VALUE:
+	LDI  R20, MIN_COUNTER_VALUE
+	CALL SET_PORTD
+
+	POP  R17
 	RET
 
 ;*********************************************************************
 ;  Subroutine DEC_COUNTER
 ;*********************************************************************
 DEC_COUNTER:
+	PUSH R17
+
+	LDI  R17, MIN_COUNTER_VALUE
 	DEC  R20
+	CP   R17, R20
+	BRCS SET_COUNTER_TO_MAX_VALUE
+
+	CALL SET_PORTD
+
+	POP  R17
+	RET
+
+SET_COUNTER_TO_MAX_VALUE:
+	LDI  R20, MAX_COUNTER_VALUE
+	CALL SET_PORTD
+	
+	POP  R17
+	RET
+
+;*********************************************************************
+;  Subroutine SET_PORTD
+;*********************************************************************
+SET_PORTD:
 	SWAP R20
 	OUT  PORTD, R20
 	SWAP R20
