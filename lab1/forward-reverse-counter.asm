@@ -14,8 +14,8 @@
    .EQU BAUD_RATE_57600 = 16      ; Constant for baud rate
    .EQU ASCII_D = 68              ; D letter in ASCII code
    .EQU ASCII_I = 73			  ; I letter in ASCII code
-   .EQU MIN_COUNTER_VALUE = 0	  ; Minimum counter value
-   .EQU MAX_COUNTER_VALUE = 15	  ; Maximum counter value
+   .EQU MIN_COUNTER_VALUE = 0x00  ; Minimum counter value
+   .EQU MAX_COUNTER_VALUE = 0x0F  ; Maximum counter value
 
    .CSEG		; FLASH segment code
    .ORG 0		; entry point after POWER/RESET
@@ -109,20 +109,20 @@ DEC_COUNTER:
 	PUSH R17
 
 	LDI  R17, MIN_COUNTER_VALUE
-	DEC  R20
-	CP   R17, R20
-	BRCS SET_COUNTER_TO_MAX_VALUE
+	CPSE R17, R20
+	JMP  DEC_REG
 
+	LDI  R20, MAX_COUNTER_VALUE
 	CALL SET_PORTD
 
 	POP  R17
 	RET
 
-SET_COUNTER_TO_MAX_VALUE:
-	LDI  R20, MAX_COUNTER_VALUE
+DEC_REG:
+	DEC  R20
 	CALL SET_PORTD
-	
-	POP  R17
+
+	POP R17
 	RET
 
 ;*********************************************************************
