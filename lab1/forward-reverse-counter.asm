@@ -24,6 +24,10 @@
    .ORG 0x100
 
 RESET:
+	IN   R16, PINC          ; Waits reset switch to be released
+	ANDI R16, 0b01000000    ;
+	BREQ RESET              ;
+
     LDI R16, LOW(0x8FF)	    ; Sets Stack Pointer to RAMEND
     OUT SPL, R16            ;
     LDI R16, HIGH(0x8FF)    ;
@@ -68,16 +72,17 @@ CHECK_PIN_STATE:
 ;  Waits the switch to be released
 ;*********************************************************************
 WAIT_SWITCH_RELEASE:
-    IN   R19, PIND			  
+    IN   R19, PIND
     ANDI R19, 0b00000100	  
     BREQ WAIT_SWITCH_RELEASE
 
-UPDATE_COUNTER:
-    SBRS R21, 0
-    CALL INC_COUNTER
+UPDATE_COUNTER:         ; Updates counter after switch is released.
+						; R21 stores the current mode. 0x00 means increase, and 0x01 means decrease.
+    SBRS R21, 0         ; Skips next instruction if bit 0 is 1
+    CALL INC_COUNTER    ; Increases the count
 
-    SBRC R21, 0
-    CALL DEC_COUNTER 
+    SBRC R21, 0         ; Skips next instruction if bit 0 is 0
+    CALL DEC_COUNTER    ; Decreases the count
     RET
 
 ;*********************************************************************
@@ -86,24 +91,24 @@ UPDATE_COUNTER:
 ;  Sets the count in the valid range, if necessary
 ;*********************************************************************
 INC_COUNTER:
-    PUSH R17
+    PUSH R17                       ; Saves R17 into stack
 
-    LDI  R17, MAX_COUNTER_VALUE
-    INC  R20
-    CP   R17, R20
-    BRCS SET_COUNTER_TO_MIN_VALUE
+    LDI  R17, MAX_COUNTER_VALUE    ; Loads 15 into R17
+    INC  R20                       ; Increases the current count
+    CP   R17, R20                  ; Compares current value and max value
+    BRCS SET_COUNTER_TO_MIN_VALUE  ; Sets counter to zero if count > 15
 	
-    CALL SET_PORTD
+    CALL SET_PORTD                 ; Sets PORTD to R20
 
-    POP  R17
-    RET
+    POP  R17                       ; Restores R17
+    RET                            ; Returns to UPDATE_COUNTER
 
-SET_COUNTER_TO_MIN_VALUE:
-    LDI  R20, MIN_COUNTER_VALUE
-    CALL SET_PORTD
+SET_COUNTER_TO_MIN_VALUE:          ; Sets count to zero
+    LDI  R20, MIN_COUNTER_VALUE    ;
+    CALL SET_PORTD                 ;
 
-    POP  R17
-    RET
+    POP  R17                       ; Restores R17
+    RET                            ; Returns to UPDATE_COUNTER
 
 ;*********************************************************************
 ;  Subroutine DEC_COUNTER
@@ -111,24 +116,24 @@ SET_COUNTER_TO_MIN_VALUE:
 ;  Sets the count in the valid range, if necessary
 ;*********************************************************************
 DEC_COUNTER:
-    PUSH R17
+    PUSH R17                       ; Saves R17 into stack
 
-    LDI  R17, MIN_COUNTER_VALUE
-    CPSE R17, R20
-    JMP  DEC_REG
+    LDI  R17, MIN_COUNTER_VALUE    ; Loads zero into R17
+    CPSE R17, R20                  ; Compares zero and current count
+    JMP  DEC_REG                   ; Decreases R20 if current count is not zero
 
-    LDI  R20, MAX_COUNTER_VALUE
-    CALL SET_PORTD
+    LDI  R20, MAX_COUNTER_VALUE    ; Loads 15 into R20 if current count is zero
+    CALL SET_PORTD                 ; Sets PORTD to R20
 
-    POP  R17
-    RET
+    POP  R17                       ; Restores R17
+    RET                            ; Returns to UPDATE_COUNTER
 
 DEC_REG:
-    DEC  R20
-    CALL SET_PORTD
+    DEC  R20                       ; Decreases current count R20
+    CALL SET_PORTD                 ; Sets PORTD to R20
 
-    POP R17
-    RET
+    POP R17                        ; Restores R17
+    RET                            ; Returns to UPDATE_COUNTER
 
 ;*********************************************************************
 ;  Subroutine SET_PORTD
@@ -136,10 +141,10 @@ DEC_REG:
 ;  R20 stores the count
 ;*********************************************************************
 SET_PORTD:
-    SWAP R20
+    SWAP R20           ; R20 needs swap because D7-D4 is being used
     OUT  PORTD, R20
-    SWAP R20
-    RET
+    SWAP R20           ; Restores R20 in order to use inc/dec operations
+    RET                
 
 ;*********************************************************************
 ;  Subroutine SET_COUNTER_MODE
@@ -149,21 +154,21 @@ SET_PORTD:
 ;  R21 stores the current counter mode
 ;*********************************************************************
 SET_COUNTER_MODE:
-    CPI  R16, ASCII_D       ; Verifies if D key was pressed
-    BREQ PRESS_D            ;
+    CPI  R16, ASCII_D            ; Verifies if D key was pressed
+    BREQ PRESS_D                 ;
 
-    CPI  R16, ASCII_I       ; Verifies if I key was pressed
-    BREQ PRESS_I            ;
+    CPI  R16, ASCII_I            ; Verifies if I key was pressed
+    BREQ PRESS_I                 ;
     RET
 
-PRESS_D:
+PRESS_D:                         ; Verifies if decrease mode was active
     CPI  R21, 0x01
-    BRNE SET_COUNTER_DEC_MODE
+    BRNE SET_COUNTER_DEC_MODE    ; Switches mode if decrease mode was not active
     RET
 
-PRESS_I:
+PRESS_I:                         ; Verifies if increase mode was active
     CPI  R21, 0x00
-    BRNE SET_COUNTER_INC_MODE
+    BRNE SET_COUNTER_INC_MODE    ; Switches mode if increase mode was not active
     RET
 
 ;*********************************************************************
