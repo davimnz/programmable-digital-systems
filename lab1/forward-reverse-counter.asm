@@ -24,9 +24,9 @@
    .ORG 0x100
 
 RESET:
-	IN   R16, PINC          ; Waits reset switch to be released
-	ANDI R16, 0b01000000    ;
-	BREQ RESET              ;
+    IN   R16, PINC          ; Waits reset switch to be released
+    ANDI R16, 0b01000000    ;
+    BREQ RESET              ;
 
     LDI R16, LOW(0x8FF)	    ; Sets Stack Pointer to RAMEND
     OUT SPL, R16            ;
@@ -77,7 +77,7 @@ WAIT_SWITCH_RELEASE:
     BREQ WAIT_SWITCH_RELEASE
 
 UPDATE_COUNTER:         ; Updates counter after switch is released.
-						; R21 stores the current mode. 0x00 means increase, and 0x01 means decrease.
+                        ; R21 stores the current mode. 0x00 means increase, and 0x01 means decrease.
     SBRS R21, 0         ; Skips next instruction if bit 0 is 1
     CALL INC_COUNTER    ; Increases the count
 
