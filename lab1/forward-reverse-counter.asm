@@ -32,43 +32,44 @@ RESET:
 	CALL USART_INIT  ; Goes to USART initialization code
 	CALL PORTD_INIT  ; Goes to PORTD initialization code
 
-	LDI  ZH, HIGH(2*MSG_INC)  ; Prints a message that has increase mode instruction
+	LDI  ZH, HIGH(2*MSG_INC)  ; Prints increase mode instruction
 	LDI  ZL, LOW(2*MSG_INC)
 	CALL SEND_MSG
 
-	LDI  ZH, HIGH(2*MSG_DEC)  ; Prints a message that has decrease mode instruction
+	LDI  ZH, HIGH(2*MSG_DEC)  ; Prints decrease mode instruction
 	LDI  ZL, LOW(2*MSG_DEC)
 	CALL SEND_MSG
 
 	LDI R20, 0x00  ; R20 stores the current counter value
 	LDI R21, 0x00  ; R21 stores the current counter mode (increase 0x00, decrease 0x01)
 	
-	LDI ZH, HIGH(2*MSG_DEFAULT_MODE)  ; Prints a message that specifies the default counter mode
+	LDI ZH, HIGH(2*MSG_DEFAULT_MODE)  ; Prints a message that specifies the default counter mode (increase)
 	LDI ZL, LOW(2*MSG_DEFAULT_MODE)
 	CALL SEND_MSG
 
-READ_TO_GO:				   ; Waits for open switch to start couting
-	IN   R16, PIND         ;
-    ANDI R16, 0b00000100   ;
-    BREQ READ_TO_GO        ;
+READ_TO_GO:				      ; Waits for open switch to start couting
+	IN   R16, PIND            ;
+    ANDI R16, 0b00000100      ;
+    BREQ READ_TO_GO           ;
 
 CHECK_TERM:
-	CALL USART_RECEIVE     ; Receives counter mode instruction given by terminal
-	CALL SET_COUNTER_MODE  ; Changes counter mode if the user request
+	CALL USART_RECEIVE        ; Receives counter mode instruction given by terminal
+	CALL SET_COUNTER_MODE     ; Changes counter mode if the user request
 
 CHECK_PIN_STATE:
-	IN	 R19, PIND
-	SBRS R19, 2
-	CALL WAIT_SWITCH_RELEASE
+	IN	 R19, PIND			  ; Verifies if D2 is active
+	SBRS R19, 2				  ;
+	CALL WAIT_SWITCH_RELEASE  ;
 
-	JMP  CHECK_TERM
+	JMP  CHECK_TERM			  ; Main loop
 
 ;*********************************************************************
 ;  Subroutine WAIT_SWITCH_RELEASE
+;  Waits the switch to be released
 ;*********************************************************************
 WAIT_SWITCH_RELEASE:
-	IN   R19, PIND
-	ANDI R19, 0b00000100
+	IN   R19, PIND			  
+	ANDI R19, 0b00000100	  
 	BREQ WAIT_SWITCH_RELEASE
 
 UPDATE_COUNTER:
@@ -81,6 +82,8 @@ UPDATE_COUNTER:
 
 ;*********************************************************************
 ;  Subroutine INC_COUNTER
+;  Increases the counter value by one
+;  Sets the count in the valid range, if necessary
 ;*********************************************************************
 INC_COUNTER:
 	PUSH R17
@@ -104,6 +107,8 @@ SET_COUNTER_TO_MIN_VALUE:
 
 ;*********************************************************************
 ;  Subroutine DEC_COUNTER
+;  Decreases the counter value by one
+;  Sets the count in the valid range, if necessary
 ;*********************************************************************
 DEC_COUNTER:
 	PUSH R17
@@ -127,6 +132,8 @@ DEC_REG:
 
 ;*********************************************************************
 ;  Subroutine SET_PORTD
+;  Updates the value of PORTD
+;  R20 stores the count
 ;*********************************************************************
 SET_PORTD:
 	SWAP R20
@@ -136,13 +143,17 @@ SET_PORTD:
 
 ;*********************************************************************
 ;  Subroutine SET_COUNTER_MODE
+;  Updates the counter mode for a given key
+;  The current mode only switches if the new mode is different from the current
+;  R16 stores the latest pressed key
+;  R21 stores the current counter mode
 ;*********************************************************************
 SET_COUNTER_MODE:
-	CPI  R16, ASCII_D
-	BREQ PRESS_D
+	CPI  R16, ASCII_D		; Verifies if D key was pressed
+	BREQ PRESS_D			;
 
-	CPI  R16, ASCII_I
-	BREQ PRESS_I
+	CPI  R16, ASCII_I		; Verifies if I key was pressed
+	BREQ PRESS_I			;
 	RET
 
 PRESS_D:
@@ -157,27 +168,31 @@ PRESS_I:
 
 ;*********************************************************************
 ;  Subroutine SET_COUNTER_INC_MODE
+;  Sets the counter mode to increase
+;  R21 stores the current counter mode
 ;*********************************************************************
 SET_COUNTER_INC_MODE:
 	LDI  R21, 0x00						  ; 0x00 flag means increase mode
 
 	LDI  ZH, HIGH(2*MSG_INC_CONFIRMATION) ; Prints confirmation message of increase mode
-	LDI  ZL, LOW(2*MSG_INC_CONFIRMATION)
-	CALL SEND_MSG
+	LDI  ZL, LOW(2*MSG_INC_CONFIRMATION)  ;
+	CALL SEND_MSG						  ;
 	
-	JMP CHECK_PIN_STATE
+	JMP CHECK_PIN_STATE					  ; Returns to main loop
 
 ;*********************************************************************
 ;  Subroutine SET_COUNTER_DEC_MODE
+;  Sets the counter mode to decrease
+;  R21 stores the current counter mode
 ;*********************************************************************
 SET_COUNTER_DEC_MODE:
 	LDI  R21, 0x01						  ; 0x01 flag means decrease mode
 
 	LDI  ZH, HIGH(2*MSG_DEC_CONFIRMATION) ; Prints confirmation message of decrease mode
-	LDI  ZL, LOW(2*MSG_DEC_CONFIRMATION)
-	CALL SEND_MSG
+	LDI  ZL, LOW(2*MSG_DEC_CONFIRMATION)  ;
+	CALL SEND_MSG						  ;
 	
-	JMP CHECK_PIN_STATE
+	JMP CHECK_PIN_STATE					  ; Returns to main loop
 
 ;*********************************************************************
 ;  Subroutine PORTD_INIT
