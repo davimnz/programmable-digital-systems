@@ -1,0 +1,13 @@
+# atmel studio files
+*.asmproj
+*.atsln
+*.hex
+*.lss
+*.map
+*.obj
+*.tmp
+*.atsuo
+
+# proteus files
+*.workspace
+*.pdsbak
