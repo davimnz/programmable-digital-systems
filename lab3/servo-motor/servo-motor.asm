@@ -19,8 +19,7 @@
    .EQU ENTER_ASCII = 10     ; Enter key value
    
    .EQU PERIOD_COUNT = 40000      ; Time constant for 20ms
-   .EQU MIN_COUNT = 2000          ; Time constant for 1ms
-   .EQU DEFAULT_COUNT = 3000      ; Default constant for motors
+   .EQU DEFAULT_COUNT = 2999      ; Default count constant for motors
 
    .CSEG                     ; FLASH segment code
    .ORG 0                    ; Entry point after POWER/RESET
@@ -122,6 +121,21 @@ READ_ANGLE_DIGIT_2:
     CALL USART_TRANSMIT
     JMP  RUN_PROTOCOL
 
+CHANGE_SERVO_0:
+    STS OCR1CH, R26
+    STS OCR1CL, R27
+	JMP READ_PROTOCOL
+
+CHANGE_SERVO_1:
+    STS OCR1BH, R26
+	STS OCR1BL, R27
+	JMP READ_PROTOCOL
+
+CHANGE_SERVO_2:
+    STS OCR1AH, R26
+	STS OCR1AL, R27
+	JMP READ_PROTOCOL
+
 GET_COUNT:
     PUSH R16     ; Saves R16 into stack
 
@@ -142,13 +156,8 @@ GET_COUNT:
 GET_PLUS_COUNT:
 	LDI R26, HIGH(DEFAULT_COUNT)
 	LDI R27, LOW(DEFAULT_COUNT)
-    JMP MULTIPLY_11
 
-GET_MINUS_COUNT:
-    LDI R26, HIGH(MIN_COUNT)
-	LDI R27, LOW(MIN_COUNT)
-
-MULTIPLY_11:
+PLUS_MULTIPLY_11:
     LDI R16, 11
 	ADD R27, R16
 	LDI R16, 0
@@ -157,25 +166,32 @@ MULTIPLY_11:
 	DEC R25
 
 	CPI  R25, 0
-	BRNE MULTIPLY_11
+	BRNE PLUS_MULTIPLY_11
+
+	ADD  R27, R23 ; remove error
 
 	POP R16 ; Restores R16
 	RET
 
-CHANGE_SERVO_0:
-    STS OCR1CH, R26
-    STS OCR1CL, R27
-	JMP READ_PROTOCOL
+GET_MINUS_COUNT:
+    LDI R26, HIGH(DEFAULT_COUNT)
+	LDI R27, LOW(DEFAULT_COUNT)
 
-CHANGE_SERVO_1:
-    STS OCR1BH, R26
-	STS OCR1BL, R27
-	JMP READ_PROTOCOL
+MINUS_MULTIPLY_11:
+    LDI R16, 11
+	SUB R27, R16
+	LDI R16, 0
+	SBC R26, R16
 
-CHANGE_SERVO_2:
-    STS OCR1AH, R26
-	STS OCR1AL, R27
-	JMP READ_PROTOCOL
+	DEC R25
+
+	CPI  R25, 0
+	BRNE MINUS_MULTIPLY_11
+
+	SUB R27, R23 ; remove error
+
+	POP R16
+	RET
 
 ;*********************************************************************
 ;  Subroutine USART_INIT  
