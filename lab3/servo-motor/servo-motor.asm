@@ -49,41 +49,63 @@ RESET:
 
 READ_PROTOCOL:
     CALL USART_RECEIVE       ; Reads a character from the keyboard to R16
-
-    CPI  R16, 0x00           ; Avoids reading no characters
-    BREQ READ_PROTOCOL       ;
+	CALL USART_TRANSMIT
 	
-    CPI  R20, 0x00           ; Reads the first letter S
-    BREQ READ_S              ;
+	;CPI  R16, S_ASCII
+	;BREQ READ_SERVO_NUMBER
 
-    CPI  R20, S_ASCII        ; Reads the servo number after the S letter
-    BREQ READ_SERVO_NUMBER   ;
+READ_SERVO_NUMBER:
+    CALL USART_RECEIVE
+	CALL USART_TRANSMIT
 
-    CPI  R16, PLUS_ASCII     ; Saves the plus sign into R22
-    BREQ READ_SIGN           ;
+	CPI  R16, 0x30
+	BREQ STORE_SERVO_NUMBER
 
-    CPI  R16, MINUS_ASCII    ; Saves the minus sign into R22
-    BREQ READ_SIGN           ;
+	CPI  R16, 0x31
+	BREQ STORE_SERVO_NUMBER
 
-    CPI  R20, PLUS_ASCII     ; Reads the first digit of the angle after a plus sign
-    BREQ READ_ANGLE_DIGIT_1  ;
+	CPI  R16, 0x32
+	BREQ STORE_SERVO_NUMBER
 
-    CPI  R20, MINUS_ASCII    ; Reads the first digit of the angle after a minus sign
-    BREQ READ_ANGLE_DIGIT_1  ;
+    ;JMP  READ_PROTOCOL
 
-    CPI  R16, ENTER_ASCII    ; Reads the second digit of the angle after sign
-    BREQ STORE_AND_TRANSMIT  ;
+STORE_SERVO_NUMBER:
+    MOV  R21, R16  ; Subtracts zero ASCII code to obtain the number
+	SUBI R21, 0x30 ;
 
-    JMP  READ_ANGLE_DIGIT_2  ; Reads the second digit of the angle
+READ_SIGN:
+    CALL USART_RECEIVE
+	CALL USART_TRANSMIT
 
-STORE_AND_TRANSMIT:
-    MOV  R20, R16            ; Saves the current character into R20
-    CALL USART_TRANSMIT      ; Prints the last character and clears R16
+	CPI  R16, PLUS_ASCII
+	BREQ STORE_SIGN
 
-    JMP  READ_PROTOCOL       ; Waits enter key to finish
+	CPI  R16, MINUS_ASCII
+	BREQ STORE_SIGN
 
+    ;JMP  READ_PROTOCOL
+
+STORE_SIGN:
+    MOV R22, R16
+
+READ_ANGLE_FIRST_DIGIT:
+    CALL USART_RECEIVE
+	CALL USART_TRANSMIT
+
+	MOV  R23, R16  ; Subtracts zero ASCII code to get the digit
+	SUBI R23, 0x30 ;
+
+READ_ANGLE_SECOND_DIGIT:
+    CALL USART_RECEIVE
+	CALL USART_TRANSMIT
+
+	MOV  R24, R16  ; Subtracts zero ASCII code to get the digit
+	SUBI R24, 0x30 ;
+
+	LDI  R16, 0x0D      ; Prints a new line
+    CALL USART_TRANSMIT ;
+    
 RUN_PROTOCOL:
-    LDI R28, 0x0a
     CALL GET_COUNT  ; correct
 
 	CPI  R21, 0
@@ -94,32 +116,6 @@ RUN_PROTOCOL:
 
 	CPI  R21, 2
 	BREQ CHANGE_SERVO_2
-
-READ_S:    
-    JMP STORE_AND_TRANSMIT
-
-READ_SERVO_NUMBER:
-    MOV  R21, R16
-	SUBI R21, 0x30 ; Subtracts zero ASCII code to obtain the number
-    JMP  STORE_AND_TRANSMIT
-
-READ_SIGN:
-    MOV  R22, R16
-    JMP  STORE_AND_TRANSMIT
-
-READ_ANGLE_DIGIT_1:
-    MOV  R23, R16
-	SUBI R23, 0x30 ; Subtracts zero ASCII code to obtain the digit
-    JMP  STORE_AND_TRANSMIT
-
-READ_ANGLE_DIGIT_2:
-    MOV  R24, R16
-	SUBI R24, 0x30  ; Subtracts zero ASCII code to obtain the digit
-    LDI  R20, 0x00
-    CALL USART_TRANSMIT
-    LDI  R16, 0x0D
-    CALL USART_TRANSMIT
-    JMP  RUN_PROTOCOL
 
 CHANGE_SERVO_0:
     STS OCR1CH, R26
@@ -157,6 +153,9 @@ GET_PLUS_COUNT:
 	LDI R26, HIGH(DEFAULT_COUNT)
 	LDI R27, LOW(DEFAULT_COUNT)
 
+	CPI  R25, 0
+	BREQ RETURN_PLUS_MULTIPLY_11
+
 PLUS_MULTIPLY_11:
     LDI R16, 11
 	ADD R27, R16
@@ -168,14 +167,22 @@ PLUS_MULTIPLY_11:
 	CPI  R25, 0
 	BRNE PLUS_MULTIPLY_11
 
-	ADD  R27, R23 ; remove error
+	MOV R16, R23
+	INC R16
+	ADD R27, R16 ; Sums additional values to reduce angle error
+	LDI R16, 0
+	ADC R26, R16
 
+RETURN_PLUS_MULTIPLY_11:
 	POP R16 ; Restores R16
 	RET
 
 GET_MINUS_COUNT:
     LDI R26, HIGH(DEFAULT_COUNT)
 	LDI R27, LOW(DEFAULT_COUNT)
+
+	CPI  R25, 0
+	BREQ RETURN_MINUS_MULTIPLY_11
 
 MINUS_MULTIPLY_11:
     LDI R16, 11
@@ -188,8 +195,13 @@ MINUS_MULTIPLY_11:
 	CPI  R25, 0
 	BRNE MINUS_MULTIPLY_11
 
-	SUB R27, R23 ; remove error
+	SUB  R27, R23 ; Subtracts additional values to reduce angle error
+	LDI  R16, 0   ;
+	SBC  R26, R16 ;
+	SUBI R27, 1   ;
+	SBC  R26, R16 ;
 
+RETURN_MINUS_MULTIPLY_11:
 	POP R16
 	RET
 
@@ -225,7 +237,6 @@ WAIT_TRANSMIT:
     SBRS R17, UDRE0       ; Waits for TX buffer to get empty
     RJMP WAIT_TRANSMIT
     STS	 UDR0, R16        ; Writes data into the buffer
-    ANDI R16, 0x00        ; Clears R16 to avoid multiple transmits
 
     POP	R17               ; Restores R17
     RET
@@ -237,9 +248,11 @@ WAIT_TRANSMIT:
 USART_RECEIVE:
     PUSH R17               ; Saves R17 into stack
 
+WAIT_RECEIVE:
     LDS	 R17, UCSR0A
-    SBRC R17, RXC0
-    LDS  R16, UDR0         ; Reads the data
+    SBRS R17, RXC0
+	RJMP WAIT_RECEIVE      ; Waits data
+	LDS  R16, UDR0         ; Reads the data
 
     POP	 R17               ; Restores R17
     RET
@@ -264,7 +277,7 @@ TIMER1_INIT_MODE14:
     LDI R16, LOW(PERIOD_COUNT)
     STS ICR1L, R16
 
-; OCR1A, OCR1B, OCR1C = 3000
+; OCR1A, OCR1B, OCR1C = 2999
     LDI R16, DEFAULT_COUNT>>8
     STS OCR1AH, R16
     STS OCR1BH, R16
