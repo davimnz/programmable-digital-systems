@@ -1,0 +1,45 @@
+/*
+ * master_slave.asm
+ *
+ *  Created: 15/10/2021 22:07:11
+ *   Author: DAVI MUNIZ
+ */
+
+   .CSEG
+   .ORG  0
+    JMP  RESET
+
+   .ORG  0x100
+
+RESET:
+    LDI R16, HIGH(RAMEND)
+    OUT SPH, R16
+    LDI R16, LOW(RAMEND)
+    OUT SPL, R16
+
+    CALL INIT_PORTF
+    CALL INIT_PORTL
+
+GET_TYPE:
+    LDS  R16, PINL
+    SBRC R16, 7
+    JMP  MASTER
+	JMP  SLAVE
+
+MASTER:
+    LDI R16, 0b00000001
+    OUT PORTF, R16
+	JMP MASTER
+
+SLAVE:
+    JMP SLAVE
+
+INIT_PORTF:
+    LDI R16, 0b00000001
+    OUT DDRF, R16
+	RET
+
+INIT_PORTL:
+    LDI R16, 0b00000000
+    STS DDRL, R16        ; verify
+	RET
