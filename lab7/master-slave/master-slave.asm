@@ -44,6 +44,7 @@ RESET:
 
     CALL INIT_PORTF   ; sets F0 as output
     CALL INIT_PORTL   ; sets L7 as input
+	CALL INIT_PORTH   ; sets H0, H1 as output
 	CALL USART0_INIT
 	CALL USART1_INIT
 
@@ -161,20 +162,8 @@ SLAVE_READ_ANGLE_SECOND_DIGIT:
 
 	MOV  R25, R22         ; r25 stores the second digit of angle
 	SUBI R25, 0x30        ; subtracts zero ASCII code to get digit
-
-SLAVE_SUCCESS_READ_ENTER:
-    CALL USART1_RECEIVE
-	CPI  R16, 0x0D
-	BREQ SLAVE_SUCCESS
 	JMP  SLAVE_SUCCESS_READ_ENTER
 
-SLAVE_SUCCESS:
-	LDI  R16, ACK_CODE             ; sends ack code to master
-	CALL USART1_TRANSMIT           ;
-
-    CALL SLAVE_SEND_RECEIVED_MSG   ; sends master message to usart 0
-
-	JMP  SLAVE_READ_FIRST          ; goes back to read another input
 
 SLAVE_READ_LED:
     CALL USART1_RECEIVE
@@ -226,6 +215,78 @@ SLAVE_READ_LED_STATUS_ON:
 	BREQ SLAVE_SUCCESS_READ_ENTER
 
 	JMP  SLAVE_UNSUCCESS
+
+SLAVE_SUCCESS_READ_ENTER:
+    CALL USART1_RECEIVE
+	CPI  R16, 0x0D
+	BREQ SLAVE_SUCCESS
+	JMP  SLAVE_SUCCESS_READ_ENTER
+
+SLAVE_SUCCESS:
+	LDI  R16, ACK_CODE             ; sends ack code to master
+	CALL USART1_TRANSMIT           ;
+
+    CALL SLAVE_SEND_RECEIVED_MSG   ; sends master message to usart 0
+
+	CPI  R18, L_KEY
+	BREQ SLAVE_SUCCESS_LED
+	
+	CPI  R18, S_KEY
+	BREQ SLAVE_SUCCESS_SERVO  
+
+	JMP  SLAVE_READ_FIRST          ; goes back to read another input
+
+SLAVE_SUCCESS_LED:
+    CPI  R19, 0x30
+	BREQ SLAVE_CHANGE_LED_0
+
+	CPI  R19, 0x31
+	BREQ SLAVE_CHANGE_LED_1
+
+SLAVE_CHANGE_LED_0:
+    CPI  R22, F_KEY
+	BREQ SLAVE_LED_0_OFF
+
+	CPI  R22, N_KEY
+	BREQ SLAVE_LED_0_ON
+
+SLAVE_LED_0_OFF:
+    LDS R16, PORTH
+	LDI R17, 0b11111110
+	AND R16, R17
+	STS PORTH, R16
+	JMP SLAVE_READ_FIRST
+
+SLAVE_LED_0_ON:
+    LDS R16, PORTH
+	LDI R17, 0b00000001
+	OR  R16, R17
+    STS PORTH, R16
+	JMP SLAVE_READ_FIRST
+
+SLAVE_CHANGE_LED_1:
+    CPI  R22, F_KEY
+	BREQ SLAVE_LED_1_OFF
+
+	CPI  R22, N_KEY
+	BREQ SLAVE_LED_1_ON
+
+SLAVE_LED_1_OFF:
+    LDS R16, PORTH
+	LDI R17, 0b11111101
+	AND R16, R17
+	STS PORTH, R16
+	JMP SLAVE_READ_FIRST
+
+SLAVE_LED_1_ON:
+    LDS R16, PORTH
+	LDI R17, 0b00000010
+	OR  R16, R17
+    STS PORTH, R16
+	JMP SLAVE_READ_FIRST
+
+SLAVE_SUCCESS_SERVO:
+    JMP SLAVE_READ_FIRST
 
 SLAVE_UNSUCCESS_1:
     CALL USART1_RECEIVE
@@ -362,6 +423,15 @@ INIT_PORTF:
 INIT_PORTL:
     LDI R16, 0b00000000
     STS DDRL, R16
+	RET
+
+;*********************************************************************
+;  Subroutine INIT_PORTH
+;  Sets PH0, PH1 as input and PH2-7 as output 
+;*********************************************************************
+INIT_PORTH:
+    LDI R16, 0b00000011
+	STS DDRH, R16
 	RET
 
 ;*********************************************************************
