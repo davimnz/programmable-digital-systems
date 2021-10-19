@@ -25,7 +25,7 @@
    .EQU PERIOD_COUNT = 40000   ; time constant for 20ms
    .EQU DEFAULT_COUNT = 2999   ; default count constant for zero degrees
 
-   .EQU ACK_CODE = 0           ; ack code sent by slave to master
+   .EQU ACK_CODE = 0           ; ack code sent by slave to master      
 
    .CSEG
    .ORG  0
@@ -39,191 +39,194 @@ RESET:
     LDI R16, LOW(RAMEND)    ;
     OUT SPL, R16            ;
 
-	LDI R16, 0x00     ; stores character received by usart
-	LDI R17, 0x00     ; stores variables in usart subroutines
+    LDI R16, 0x00     ; stores character received by usart
+    LDI R17, 0x00     ; stores variables in usart subroutines
 
-	LDI R18, 0x00     ; stores first protocol character
-	LDI R19, 0x00     ; stores second protocol character
-	LDI R20, 0x00     ; stores third protocol character
-	LDI R21, 0x00     ; stores fourth protocol character
-	LDI R22, 0x00     ; stores fifth protocol character
-	LDI R24, 0x00     ; stores angle first digit
-	LDI R25, 0x00     ; stores angle second digit
+    LDI R18, 0x00     ; stores first protocol character
+    LDI R19, 0x00     ; stores second protocol character
+    LDI R20, 0x00     ; stores third protocol character
+    LDI R21, 0x00     ; stores fourth protocol character
+    LDI R22, 0x00     ; stores fifth protocol character
+    LDI R24, 0x00     ; stores angle first digit
+    LDI R25, 0x00     ; stores angle second digit
 
-	LDI R26, 0x00     ; stores the high part of count (16-bit)
-	LDI R27, 0x00     ; stores the low part of count (16-bit)
-	LDI R28, 0x00     ; stores the angle (8-bit)
+    LDI R26, 0x00     ; stores the high part of count (16-bit)
+    LDI R27, 0x00     ; stores the low part of count (16-bit)
+    LDI R28, 0x00     ; stores the angle (8-bit)
 	
-	LDI R23, 0x00     ; stores number of characters in a line of master's terminal
+    LDI R23, 0x00     ; stores number of characters in a line of master's terminal
 
     CALL INIT_PORTF   ; sets F0 as output
     CALL INIT_PORTL   ; sets L7 as input
-	CALL INIT_PORTH   ; sets H0, H1 as output
-	CALL USART0_INIT  ; initializes usart 0 (terminal)
-	CALL USART1_INIT  ; initializes usart 1 (master - slave communication)
+    CALL USART0_INIT  ; initializes usart 0 (terminal)
+    CALL USART1_INIT  ; initializes usart 1 (master - slave communication)
 
 GET_TYPE:             ; sets the microcontroller type - master or slave
     LDS  R16, PINL    ; reads PINL
     SBRC R16, 7       ; if L7 is clear, then type is slave. Goes to the SLAVE main function
     JMP  MASTER       ; if L7 is set, then type is master. Goes to the MASTER main function
-	JMP  SLAVE        ;
+    JMP  SLAVE        ;
 
 MASTER:                           ; master's main function
     LDI R16, 0b00000001           ; sets F0 led on
     OUT PORTF, R16                ;
 
+    LDI  ZH, HIGH(2*MSG_HASH)     ; sends hash of last commit
+    LDI  ZL, LOW(2*MSG_HASH)      ;
+    CALL SEND_MSG_USART0          ;
     LDI  ZH, HIGH(2*MSG_MASTER)   ; sends master identification message
-	LDI  ZL, LOW(2*MSG_MASTER)    ;
-	CALL SEND_MSG_USART0          ;
+    LDI  ZL, LOW(2*MSG_MASTER)    ;
+    CALL SEND_MSG_USART0          ;
 	
 MASTER_LOOP:                      ; master main reading loop
-	CPI  R23, 5                   ; verifies if five characters were written by user
-	BREQ MASTER_WAIT_ENTER        ; if five characters were written, then waits the final enter key
+    CPI  R23, 5                   ; verifies if five characters were written by user
+    BREQ MASTER_WAIT_ENTER        ; if five characters were written, then waits the final enter key
 
     CALL USART0_RECEIVE           ; gets character from the user
     CALL USART0_TRANSMIT          ; sends user's character to terminal
-	CALL USART1_TRANSMIT          ; sends user's character to slave
+    CALL USART1_TRANSMIT          ; sends user's character to slave
 
-	INC  R23                      ; increase number of characters written by user 
+    INC  R23                      ; increase number of characters written by user 
     CPI  R16, ENTER_KEY           ; verifies if a enter key was written by user
-	BREQ MASTER_END_WRITING       ; finishes the loop when user sends enter key
-	JMP  MASTER_LOOP              ; repeats the loop until user hits enter key or writes five characters
+    BREQ MASTER_END_WRITING       ; finishes the loop when user sends enter key
+    JMP  MASTER_LOOP              ; repeats the loop until user hits enter key or writes five characters
 
 MASTER_WAIT_ENTER:                ; waits enter key to finish a protocol with five characters
     CALL USART0_RECEIVE           ; gets character from the user
-	CPI  R16, ENTER_KEY           ; verifies if a enter key was written by user 
-	BREQ MASTER_SEND_ENTER        ; finishes protocol if r16 is enter key
-	JMP  MASTER_WAIT_ENTER        ; repeats the loop until user hits enter key
+    CPI  R16, ENTER_KEY           ; verifies if a enter key was written by user 
+    BREQ MASTER_SEND_ENTER        ; finishes protocol if r16 is enter key
+    JMP  MASTER_WAIT_ENTER        ; repeats the loop until user hits enter key
 
 MASTER_SEND_ENTER:                ; sends enter key to terminal and to slave if enter key was hitted after five characters input
     CALL USART0_TRANSMIT          ;
-	CALL USART1_TRANSMIT          ;
+    CALL USART1_TRANSMIT          ;
 
 MASTER_END_WRITING:               ; waits for slave confirmation of protocol sent by master
-    ;CALL USART0_TRANSMIT
-	;CALL USART1_TRANSMIT
     LDI  R23, 0x00                ; resets number of characters written in usart 0      
 
-	CALL USART1_RECEIVE           ; receives confirmation code from slave and stores it in r16
-	CPI  R16, ACK_CODE            ; if confirmation code is ACK_CODE, then master sent a correct protocol
-	BREQ MASTER_ACK               ;
-	JMP  MASTER_INVALID           ; if confirmation code is not ACK_CODE, then master sent a incorrect protocol
+    CALL USART1_RECEIVE           ; receives confirmation code from slave and stores it in r16
+    CPI  R16, ACK_CODE            ; if confirmation code is ACK_CODE, then master sent a correct protocol
+    BREQ MASTER_ACK               ;
+    JMP  MASTER_INVALID           ; if confirmation code is not ACK_CODE, then master sent a incorrect protocol
 
 MASTER_ACK:                       ; sends ACK message to master's terminal
     LDI  ZH, HIGH(2*MSG_ACK)      ;
-	LDI  ZL, LOW(2*MSG_ACK)       ;
-	CALL SEND_MSG_USART0          ;
-	JMP  MASTER_LOOP              ; returns to read another protocol
+    LDI  ZL, LOW(2*MSG_ACK)       ;
+    CALL SEND_MSG_USART0          ;
+    JMP  MASTER_LOOP              ; returns to read another protocol
 
 MASTER_INVALID:                   ; sends INVALID message to master's terminal
     LDI  ZH, HIGH(2*MSG_INVALID)  ;
-	LDI  ZL, LOW(2*MSG_INVALID)   ;
-	CALL SEND_MSG_USART0          ;
-	JMP  MASTER_LOOP              ; returns to read another protocol
+    LDI  ZL, LOW(2*MSG_INVALID)   ;
+    CALL SEND_MSG_USART0          ;
+    JMP  MASTER_LOOP              ; returns to read another protocol
 
 SLAVE:                            ; slave's main function
     CALL TIMER1_INIT_MODE14       ; initializes timer
-    CALL INIT_PORTB               ; initializes PORTB
-	                              ; @todo INIT_PORTH
-	LDI  ZH, HIGH(2*MSG_SLAVE)    ; sends slave identification message to terminal
-	LDI  ZL, LOW(2*MSG_SLAVE)     ;
-	CALL SEND_MSG_USART0          ;
+    CALL INIT_PORTB               ; sets B5, B6, B7 as output
+    CALL INIT_PORTH               ; sets H0, H1 as output
+    LDI  ZH, HIGH(2*MSG_HASH)     ; sends hash of last commit
+    LDI  ZL, LOW(2*MSG_HASH)      ;
+    CALL SEND_MSG_USART0          ;
+    LDI  ZH, HIGH(2*MSG_SLAVE)    ; sends slave identification message to terminal
+    LDI  ZL, LOW(2*MSG_SLAVE)     ;
+    CALL SEND_MSG_USART0          ;
 
 SLAVE_INIT_REGISTERS:             ; initializes registers to default value. 0xff means that register did not read any character
     LDI R18, 0xff                 ;
-	LDI R19, 0xff                 ;
-	LDI R20, 0xff                 ;
-	LDI R21, 0xff                 ;
-	LDI R22, 0xff                 ;
+    LDI R19, 0xff                 ;
+    LDI R20, 0xff                 ;
+    LDI R21, 0xff                 ;
+    LDI R22, 0xff                 ;
 
 SLAVE_READ_FIRST:                 ; reads first character sent by master
     CALL USART1_RECEIVE           ;
-	MOV  R18, R16                 ; r18 stores first character of protocol
+    MOV  R18, R16                 ; r18 stores first character of protocol
 
-	CPI  R18, ENTER_KEY           ; if character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R18, ENTER_KEY           ; if character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CPI  R18, S_KEY               ; verifies if first letter is "S"
-	BREQ SLAVE_READ_SERVO         ; goes to servo protocol reading
+    CPI  R18, S_KEY               ; verifies if first letter is "S"
+    BREQ SLAVE_READ_SERVO         ; goes to servo protocol reading
 
-	CPI  R18, L_KEY               ; verifies if first letter is "L"
-	BREQ SLAVE_READ_LED           ; goes to led protocol reading
+    CPI  R18, L_KEY               ; verifies if first letter is "L"
+    BREQ SLAVE_READ_LED           ; goes to led protocol reading
 
-	JMP  SLAVE_UNSUCCESS_1        ; if first letter is not valid
+    JMP  SLAVE_UNSUCCESS_1        ; if first letter is not valid
 
 SLAVE_READ_SERVO:                 ; servo protocol reading. reads second character sent by master (servo number)
     CALL USART1_RECEIVE           ; 
-	MOV  R19, R16                 ; r19 stores second character of servo protocol
+    MOV  R19, R16                 ; r19 stores second character of servo protocol
 
-	CPI  R19, ENTER_KEY           ; if second character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R19, ENTER_KEY           ; if second character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CPI  R19, 0x30                ; verifies if servo number is zero
-	BREQ SLAVE_READ_SIGNAL        ; 
+    CPI  R19, 0x30                ; verifies if servo number is zero
+    BREQ SLAVE_READ_SIGNAL        ; 
 
-	CPI  R19, 0x31                ; verifies if servo number is one
-	BREQ SLAVE_READ_SIGNAL        ; 
+    CPI  R19, 0x31                ; verifies if servo number is one
+    BREQ SLAVE_READ_SIGNAL        ; 
 
-	CPI  R19, 0x32                ; verifies if servo number is two
-	BREQ SLAVE_READ_SIGNAL        ;
+    CPI  R19, 0x32                ; verifies if servo number is two
+    BREQ SLAVE_READ_SIGNAL        ;
 
-	JMP  SLAVE_UNSUCCESS_2        ; if servo number is not valid
+    JMP  SLAVE_UNSUCCESS_2        ; if servo number is not valid
 
 SLAVE_READ_SIGNAL:                ; reads third character sent by master (plus or minus sign)
-	CALL USART1_RECEIVE           ;
-	MOV  R20, R16                 ; r20 stores third character of servo protocol
+    CALL USART1_RECEIVE           ;
+    MOV  R20, R16                 ; r20 stores third character of servo protocol
 
-	CPI  R20, ENTER_KEY           ; if third character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R20, ENTER_KEY           ; if third character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CPI  R20, PLUS_KEY                 ; verifies if sign is +
-	BREQ SLAVE_READ_ANGLE_FIRST_DIGIT  ;
+    CPI  R20, PLUS_KEY                 ; verifies if sign is +
+    BREQ SLAVE_READ_ANGLE_FIRST_DIGIT  ;
 
-	CPI  R20, MINUS_KEY                ; verifies if sign is -
-	BREQ SLAVE_READ_ANGLE_FIRST_DIGIT  ;
+    CPI  R20, MINUS_KEY                ; verifies if sign is -
+    BREQ SLAVE_READ_ANGLE_FIRST_DIGIT  ;
 
-	JMP  SLAVE_UNSUCCESS_3             ; if sign is not valid
+    JMP  SLAVE_UNSUCCESS_3             ; if sign is not valid
 
 SLAVE_READ_ANGLE_FIRST_DIGIT:     ; reads fourth character sent by master (angle first digit)
     CALL USART1_RECEIVE           ;
-	MOV  R21, R16                 ; r21 stores fourth character of servo protocol
+    MOV  R21, R16                 ; r21 stores fourth character of servo protocol
 
-	CPI  R21, ENTER_KEY           ; if fourth character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R21, ENTER_KEY           ; if fourth character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CALL FIRST_DIGIT_IS_DIGIT     ; verifies if fourth character is digit
+    CALL FIRST_DIGIT_IS_DIGIT     ; verifies if fourth character is digit
 
-	MOV  R24, R21                 ; r24 stores first digit of angle
-	SUBI R24, 0x30                ; subtracts zero ASCII code to get digit
+    MOV  R24, R21                 ; r24 stores first digit of angle
+    SUBI R24, 0x30                ; subtracts zero ASCII code to get digit
 
 SLAVE_READ_ANGLE_SECOND_DIGIT:    ; reads fifth character sent by master (angle second digit)
     CALL USART1_RECEIVE           ;
-	MOV  R22, R16                 ; r22 stores fifth character of servo protocol
+    MOV  R22, R16                 ; r22 stores fifth character of servo protocol
 
-	CPI  R22, ENTER_KEY           ; if fifth character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R22, ENTER_KEY           ; if fifth character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CALL SECOND_DIGIT_IS_DIGIT    ; verifies if fifth character is digit
+    CALL SECOND_DIGIT_IS_DIGIT    ; verifies if fifth character is digit
 
-	MOV  R25, R22                 ; r25 stores the second digit of angle
-	SUBI R25, 0x30                ; subtracts zero ASCII code to get digit
-	JMP  SLAVE_SUCCESS_READ_ENTER ; waits master's enter key to send message to master and execute protocol
+    MOV  R25, R22                 ; r25 stores the second digit of angle
+    SUBI R25, 0x30                ; subtracts zero ASCII code to get digit
+    JMP  SLAVE_SUCCESS_READ_ENTER ; waits master's enter key to send message to master and execute protocol
 
 SLAVE_UNSUCCESS_JMP:              ; auxiliary label to jump to unsuccessful protocol function
     JMP SLAVE_UNSUCCESS           ;
 
 SLAVE_READ_LED:                   ; led protocol reading. reads second character sent by master (led number)
     CALL USART1_RECEIVE           ;
-	MOV  R19, R16                 ; r19 stores second character of led protocol
+    MOV  R19, R16                 ; r19 stores second character of led protocol
 
-	CPI  R19, ENTER_KEY           ; if second character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R19, ENTER_KEY           ; if second character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CPI  R19, 0x30                ; verifies if led number is zero
-	BREQ SLAVE_READ_LED_STATUS_1  ; goes to read the first character of led status
+    CPI  R19, 0x30                ; verifies if led number is zero
+    BREQ SLAVE_READ_LED_STATUS_1  ; goes to read the first character of led status
 
-	CPI  R19, 0x31                ; verifies if led number is one
-	BREQ SLAVE_READ_LED_STATUS_1  ; goes to read the first character of led status
+    CPI  R19, 0x31                ; verifies if led number is one
+    BREQ SLAVE_READ_LED_STATUS_1  ; goes to read the first character of led status
 
     JMP SLAVE_UNSUCCESS_2         ; if led number is not valid
 
@@ -231,8 +234,8 @@ SLAVE_READ_LED_STATUS_1:          ; reads the first letter of led status
     CALL USART1_RECEIVE           ;
     MOV  R20, R16                 ; r20 stores third character of led protocol
 
-	CPI  R20, ENTER_KEY           ; if third character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function 
+    CPI  R20, ENTER_KEY           ; if third character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function 
 
     CPI  R20, O_KEY               ; verifies if first letter of led status if "O"
     BREQ SLAVE_READ_LED_STATUS_2  ; goes to read the second character of led status
@@ -243,8 +246,8 @@ SLAVE_READ_LED_STATUS_2:          ; reads the second letter of led status
     CALL USART1_RECEIVE           ;
     MOV  R21, R16                 ; r21 stores fourth character of led protocol
 
-	CPI  R21, ENTER_KEY           ; if fourth character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R21, ENTER_KEY           ; if fourth character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
     CPI  R21, F_KEY                ; verifies if second letter of led status is "F"
     BREQ SLAVE_READ_LED_STATUS_OFF ; goes to read the third character of led status. this character must be "F" to be a valid protocol 
@@ -252,100 +255,100 @@ SLAVE_READ_LED_STATUS_2:          ; reads the second letter of led status
     CPI  R21, N_KEY                ; verifies if second letter of led status is "N"
     BREQ SLAVE_READ_LED_STATUS_ON  ; goes to read the third character of led status. this character must be "N" to be a valid protocol
 
-	JMP  SLAVE_UNSUCCESS_4         ; if second letter of led status is not valid
+    JMP  SLAVE_UNSUCCESS_4         ; if second letter of led status is not valid
 
 SLAVE_READ_LED_STATUS_OFF:         ; reads the third letter of led status
     CALL USART1_RECEIVE            ;
-	MOV  R22, R16                  ; r22 stores the fifth character of led protocol
+    MOV  R22, R16                  ; r22 stores the fifth character of led protocol
 
-	CPI  R22, ENTER_KEY            ; if fifth character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP       ; goes to unsuccessful protocol function
+    CPI  R22, ENTER_KEY            ; if fifth character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP       ; goes to unsuccessful protocol function
 
-	CPI  R22, F_KEY                ; verifies if third letter of led status is "F"
-	BREQ SLAVE_SUCCESS_READ_ENTER  ; protocol is valid. waits for enter key to finish and execute the led protocol
+    CPI  R22, F_KEY                ; verifies if third letter of led status is "F"
+    BREQ SLAVE_SUCCESS_READ_ENTER  ; protocol is valid. waits for enter key to finish and execute the led protocol
 
-	JMP  SLAVE_UNSUCCESS_READ_ENTER ; if third letter of led status is not valid
+    JMP  SLAVE_UNSUCCESS_READ_ENTER ; if third letter of led status is not valid
 
 SLAVE_READ_LED_STATUS_ON:         ; reads the third letter of led status
     CALL USART1_RECEIVE           ;
-	MOV  R22, R16                 ; r22 stores the fifth character of led protocol
+    MOV  R22, R16                 ; r22 stores the fifth character of led protocol
 
-	CPI  R22, ENTER_KEY           ; if fifth character is enter key, then protocol is not valid
-	BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
+    CPI  R22, ENTER_KEY           ; if fifth character is enter key, then protocol is not valid
+    BREQ SLAVE_UNSUCCESS_JMP      ; goes to unsuccessful protocol function
 
-	CPI  R22, N_KEY               ; verifies if third letter of led status is "N"
-	BREQ SLAVE_SUCCESS_READ_ENTER ; protocol is valid. waits for enter key to finish and execute the led protocol
+    CPI  R22, N_KEY               ; verifies if third letter of led status is "N"
+    BREQ SLAVE_SUCCESS_READ_ENTER ; protocol is valid. waits for enter key to finish and execute the led protocol
 
-	JMP  SLAVE_UNSUCCESS_READ_ENTER ; if third letter of led status is not valid
+    JMP  SLAVE_UNSUCCESS_READ_ENTER ; if third letter of led status is not valid
 
 SLAVE_SUCCESS_READ_ENTER:         ; slave waits for enter key to execute a valid protocol sent by master
     CALL USART1_RECEIVE           ; 
-	CPI  R16, ENTER_KEY           ; if key sent by master is enter key, then execute protocol
-	BREQ SLAVE_SUCCESS            ;
-	JMP  SLAVE_SUCCESS_READ_ENTER ; loops until master sends a enter key
+    CPI  R16, ENTER_KEY           ; if key sent by master is enter key, then execute protocol
+    BREQ SLAVE_SUCCESS            ;
+    JMP  SLAVE_SUCCESS_READ_ENTER ; loops until master sends a enter key
 
 SLAVE_SUCCESS:                    ; executes a valid protocol and sends confirmation code to master
-	LDI  R16, ACK_CODE            ; sends ack code to master
-	CALL USART1_TRANSMIT          ;
+    LDI  R16, ACK_CODE            ; sends ack code to master
+    CALL USART1_TRANSMIT          ;
 
     CALL SLAVE_SEND_RECEIVED_MSG  ; sends master's protocol to slave's terminal
 
-	CPI  R18, L_KEY               ; if first letter of valid protocol is "L", then execute led protocol
-	BREQ SLAVE_SUCCESS_LED        ;
+    CPI  R18, L_KEY               ; if first letter of valid protocol is "L", then execute led protocol
+    BREQ SLAVE_SUCCESS_LED        ;
 	
-	CPI  R18, S_KEY               ; if first letter of valid protocol is "S", then execute servo protocol
-	BREQ SLAVE_SUCCESS_SERVO      ;
+    CPI  R18, S_KEY               ; if first letter of valid protocol is "S", then execute servo protocol
+    BREQ SLAVE_SUCCESS_SERVO      ;
 
-	JMP  SLAVE_INIT_REGISTERS     ; goes back to read another input
+    JMP  SLAVE_INIT_REGISTERS     ; goes back to read another input
 
 SLAVE_SUCCESS_LED:                ; executes a valid led protocol
     CPI  R19, 0x30                ; if led number is zero, then change led zero status
-	BREQ SLAVE_CHANGE_LED_0       ;
+    BREQ SLAVE_CHANGE_LED_0       ;
 
-	CPI  R19, 0x31                ; if led number is one, then change led one status
-	BREQ SLAVE_CHANGE_LED_1       ;
+    CPI  R19, 0x31                ; if led number is one, then change led one status
+    BREQ SLAVE_CHANGE_LED_1       ;
 
 SLAVE_CHANGE_LED_0:               ; changes led zero status, given a valid protocol
     CPI  R22, F_KEY               ; if fifth protocol character is "F", then set led 0 off. since led protocol is valid, we can only verify fifth character 
-	BREQ SLAVE_LED_0_OFF          ;
+    BREQ SLAVE_LED_0_OFF          ;
 
-	CPI  R22, N_KEY               ; if fifth protocol character is "N", then set led 0 on. since led protocol is valid, we can only verify fifth character
-	BREQ SLAVE_LED_0_ON           ;
+    CPI  R22, N_KEY               ; if fifth protocol character is "N", then set led 0 on. since led protocol is valid, we can only verify fifth character
+    BREQ SLAVE_LED_0_ON           ;
 
 SLAVE_LED_0_OFF:                  ; sets led 0 off
     LDS R16, PORTH                ; r16 stores porth value
-	LDI R17, 0b11111110           ;
-	AND R16, R17                  ; changes bit 0 of r16 to zero with a AND operation
-	STS PORTH, R16                ; sends new port values to porth
-	JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
+    LDI R17, 0b11111110           ;
+    AND R16, R17                  ; changes bit 0 of r16 to zero with a AND operation
+    STS PORTH, R16                ; sends new port values to porth
+    JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
 
 SLAVE_LED_0_ON:                   ; sets led 0 on
     LDS R16, PORTH                ; r16 stores porth value
-	LDI R17, 0b00000001           ;
-	OR  R16, R17                  ; changes bit 0 of r16 to one with a OR operation
+    LDI R17, 0b00000001           ;
+    OR  R16, R17                  ; changes bit 0 of r16 to one with a OR operation
     STS PORTH, R16                ; sends new port values to porth
-	JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
+    JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
 
 SLAVE_CHANGE_LED_1:               ; changes led one status, given a valid protocol
     CPI  R22, F_KEY               ; if fifth protocol character is "F", then set led 1 off. since led protocol is valid, we can only verify fifth character
-	BREQ SLAVE_LED_1_OFF          ;
+    BREQ SLAVE_LED_1_OFF          ;
 
-	CPI  R22, N_KEY               ; changes led one status, given a valid protocol
-	BREQ SLAVE_LED_1_ON           ; if fifth protocol character is "N", then set led 1 on. since led protocol is valid, we can only verify fifth character
+    CPI  R22, N_KEY               ; changes led one status, given a valid protocol
+    BREQ SLAVE_LED_1_ON           ; if fifth protocol character is "N", then set led 1 on. since led protocol is valid, we can only verify fifth character
 
 SLAVE_LED_1_OFF:                  ; sets led 1 off
     LDS R16, PORTH                ; r16 stores porth value
-	LDI R17, 0b11111101           ;
-	AND R16, R17                  ; changes bit 1 of r16 to zero with a AND operation
-	STS PORTH, R16                ; sends new port values to porth
-	JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
+    LDI R17, 0b11111101           ;
+    AND R16, R17                  ; changes bit 1 of r16 to zero with a AND operation
+    STS PORTH, R16                ; sends new port values to porth
+    JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
 
 SLAVE_LED_1_ON:                   ; sets led 1 on
     LDS R16, PORTH                ; r16 stores porth value
-	LDI R17, 0b00000010           ;
-	OR  R16, R17                  ; changes bit 1 of r16 to one with a OR operation
+    LDI R17, 0b00000010           ;
+    OR  R16, R17                  ; changes bit 1 of r16 to one with a OR operation
     STS PORTH, R16                ; sends new port values to porth
-	JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
+    JMP SLAVE_INIT_REGISTERS      ; goes back to read another input
 
 SLAVE_SUCCESS_SERVO:
     CALL SLAVE_GET_COUNT       ; evaluates the count for the given angle
@@ -459,86 +462,86 @@ SLAVE_RETURN_MINUS_MULTIPLY_11:   ; Finishes the evaluation of the count for a g
 
 SLAVE_UNSUCCESS_1:                ; reading of a not valid protocol after a invalid first letter. moreover, user cannot use backspace
     CALL USART1_RECEIVE           ;
-	MOV  R19, R16                 ; copies second letter of a invalid protocol to r19
+    MOV  R19, R16                 ; copies second letter of a invalid protocol to r19
 
-	CPI  R19, ENTER_KEY           ; if r19 is enter key, then finish protocol reading
-	BREQ SLAVE_UNSUCCESS          ;
+    CPI  R19, ENTER_KEY           ; if r19 is enter key, then finish protocol reading
+    BREQ SLAVE_UNSUCCESS          ;
 
 SLAVE_UNSUCCESS_2:                ; reading of a not valid protocol after a invalid second letter. moreover, user cannot use backspace
     CALL USART1_RECEIVE           ;
-	MOV  R20, R16                 ; copies third letter of a invalid protocol to r20
+    MOV  R20, R16                 ; copies third letter of a invalid protocol to r20
 
-	CPI  R20, ENTER_KEY           ; if r20 is enter key, then finish protocol reading
-	BREQ SLAVE_UNSUCCESS          ;
+    CPI  R20, ENTER_KEY           ; if r20 is enter key, then finish protocol reading
+    BREQ SLAVE_UNSUCCESS          ;
 
 SLAVE_UNSUCCESS_3:                ; reading of a not valid protocol after a invalid third letter. moreover, user cannot use backspace
     CALL USART1_RECEIVE           ;
-	MOV  R21, R16                 ; copies fourth letter of a invalid protocol to r21
+    MOV  R21, R16                 ; copies fourth letter of a invalid protocol to r21
 
-	CPI  R21, ENTER_KEY           ; if r21 is enter key, then finish protocol reading
-	BREQ SLAVE_UNSUCCESS          ;
+    CPI  R21, ENTER_KEY           ; if r21 is enter key, then finish protocol reading
+    BREQ SLAVE_UNSUCCESS          ;
 
 SLAVE_UNSUCCESS_4:                ; reading of a not valid protocol after a invalid fourth letter. moreover, user cannot use backspace
     CALL USART1_RECEIVE           ;
-	MOV  R22, R16                 ; copies fifth letter of a invalid protocol to r22
+    MOV  R22, R16                 ; copies fifth letter of a invalid protocol to r22
 
-	CPI  R22, ENTER_KEY           ; if r22 is enter key, then finish protocol reading
-	BREQ SLAVE_UNSUCCESS          ;
+    CPI  R22, ENTER_KEY           ; if r22 is enter key, then finish protocol reading
+    BREQ SLAVE_UNSUCCESS          ;
 
 SLAVE_UNSUCCESS_READ_ENTER:          ; waits for master's enter key after a invalid protocol
     CALL USART1_RECEIVE              ;
-	CPI  R16, ENTER_KEY              ; if r16 is enter key, then finishes invalid protocol
-	BREQ SLAVE_UNSUCCESS             ;
-	JMP  SLAVE_UNSUCCESS_READ_ENTER  ; loops until master sends a enter key
+    CPI  R16, ENTER_KEY              ; if r16 is enter key, then finishes invalid protocol
+    BREQ SLAVE_UNSUCCESS             ;
+    JMP  SLAVE_UNSUCCESS_READ_ENTER  ; loops until master sends a enter key
 
 SLAVE_UNSUCCESS:                     ; finishes a invalid protocol
     LDI  R16, 0xff                   ; slave uses 0xff as invalid code
-	CALL USART1_TRANSMIT             ; sends invalid message to master
-	CALL SLAVE_SEND_RECEIVED_MSG     ; sends master's protocol to slave's terminal
-	JMP  SLAVE_INIT_REGISTERS        ; goes back to read another input
+    CALL USART1_TRANSMIT             ; sends invalid message to master
+    CALL SLAVE_SEND_RECEIVED_MSG     ; sends master's protocol to slave's terminal
+    JMP  SLAVE_INIT_REGISTERS        ; goes back to read another input
 
 SLAVE_SEND_RECEIVED_MSG:             ; sends master's protocol to slave's terminal
     MOV  R16, R18                    ; copies first protocol character to r16
-	CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r18 is initialized as 0xff
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
-	CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key 
-	CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
+    CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r18 is initialized as 0xff
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
+    CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key 
+    CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
 
-	MOV  R16, R19                    ; copies second protocol character to r16
-	CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r19 is initialized as 0xff
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
-	CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
-	CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
+    MOV  R16, R19                    ; copies second protocol character to r16
+    CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r19 is initialized as 0xff
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
+    CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
+    CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
 
-	MOV  R16, R20                    ; copies third protocol character to r16
-	CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r20 is initialized as 0xff
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
-	CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
-	CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
+    MOV  R16, R20                    ; copies third protocol character to r16
+    CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r20 is initialized as 0xff
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
+    CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
+    CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
 
-	MOV  R16, R21                    ; copies fourth protocol character to r16
-	CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r21 is initialized as 0xff
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
-	CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
-	CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
+    MOV  R16, R21                    ; copies fourth protocol character to r16
+    CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r21 is initialized as 0xff
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
+    CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
+    CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
 
-	MOV  R16, R22                    ; copies fifth protocol character to r16
-	CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r22 is initialized as 0xff
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
-	CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
-	BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
-	CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
+    MOV  R16, R22                    ; copies fifth protocol character to r16
+    CPI  R16, 0xff                   ; verifies if r16 is not a valid character. r22 is initialized as 0xff
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is not a ascii character
+    CPI  R16, ENTER_KEY              ; verifies if r16 is enter key to avoid double enter printing
+    BREQ SLAVE_SEND_LF_CR            ; sends line feed carriage return if r16 is enter key
+    CALL USART0_TRANSMIT             ; sends r16 to slave's terminal if r16 is a valid character
 
 SLAVE_SEND_LF_CR:                    ; sends line feed carriage return to slave's terminal
-	LDI  R16, 0x0a                   ;
-	CALL USART0_TRANSMIT             ;
-	LDI  R16, 0X0d                   ;
-	CALL USART0_TRANSMIT             ;
-	RET
+    LDI  R16, 0x0a                   ;
+    CALL USART0_TRANSMIT             ;
+    LDI  R16, 0X0d                   ;
+    CALL USART0_TRANSMIT             ;
+    RET
 
 FIRST_DIGIT_IS_DIGIT:
     CPI  R16, 0x30         ; verifies if r16 is '0'
@@ -625,7 +628,7 @@ INIT_PORTB:
 INIT_PORTF:
     LDI R16, 0b00000001
     OUT DDRF, R16
-	RET
+    RET
 
 ;*********************************************************************
 ;  Subroutine INIT_PORTF
@@ -634,7 +637,7 @@ INIT_PORTF:
 INIT_PORTL:
     LDI R16, 0b00000000
     STS DDRL, R16
-	RET
+    RET
 
 ;*********************************************************************
 ;  Subroutine INIT_PORTH
@@ -642,8 +645,8 @@ INIT_PORTL:
 ;*********************************************************************
 INIT_PORTH:
     LDI R16, 0b00000011
-	STS DDRH, R16
-	RET
+    STS DDRH, R16
+    RET
 
 ;*********************************************************************
 ;  Subroutine USART1_INIT  
@@ -813,6 +816,8 @@ TIMER1_INIT_MODE14:
 ;*********************************************************************
 ;  Hard coded messages
 ;*********************************************************************
+MSG_HASH:
+   .DB "bb879094260615a56d2ff40f4152a8b79658acd5 ", '$'
 MSG_MASTER:
    .DB "*** MASTER *** ", 0x0A, 0x0D, '$'
 MSG_SLAVE:
