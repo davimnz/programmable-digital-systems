@@ -14,6 +14,7 @@
    .EQU BAUD_RATE_57600 = 16   ; constant for 57600 baud rate
 
    .EQU ENTER_KEY = 0x0d       ; enter ASCII code
+   .EQU LF_KEY = 0x0a          ; line feed ASCII code 
    .EQU S_KEY = 83             ; S ASCII code
    .EQU L_KEY = 76             ; L ASCII code
    .EQU PLUS_KEY = 43          ; plus sign ASCII code
@@ -25,7 +26,13 @@
    .EQU PERIOD_COUNT = 40000   ; time constant for 20ms
    .EQU DEFAULT_COUNT = 2999   ; default count constant for zero degrees
 
-   .EQU ACK_CODE = 0           ; ack code sent by slave to master      
+   .EQU A_KEY = 65             ; A ASCII code
+   .EQU C_KEY = 67             ; C ASCII code
+   .EQU K_KEY = 75             ; K ASCII code
+
+   .EQU I_KEY = 73             ; I ASCII code
+   .EQU V_KEY = 86             ; V ASCII code
+   .EQU D_KEY = 68             ; D ASCII code  
 
    .CSEG
    .ORG  0
@@ -102,24 +109,19 @@ MASTER_SEND_ENTER:                ; sends enter key to terminal and to slave if 
     CALL USART1_TRANSMIT          ;
 
 MASTER_END_WRITING:               ; waits for slave confirmation of protocol sent by master
-    LDI  R23, 0x00                ; resets number of characters written in usart 0      
+    LDI  R23, 0x00                ; resets number of characters written in usart 0
 
-    CALL USART1_RECEIVE           ; receives confirmation code from slave and stores it in r16
-    CPI  R16, ACK_CODE            ; if confirmation code is ACK_CODE, then master sent a correct protocol
-    BREQ MASTER_ACK               ;
-    JMP  MASTER_INVALID           ; if confirmation code is not ACK_CODE, then master sent a incorrect protocol
+MASTER_READ_SLAVE_RESPONSE_LOOP:          ; reads the slave's response of protocol sent by master
+    CALL USART1_RECEIVE                   ; reads a character from slave
+    CPI  R16, LF_KEY                      ; finishes the reading if character sent is enter key
+    BREQ MASTER_END                       ;
+    CALL USART0_TRANSMIT                  ; sends character to master's terminal
+    JMP  MASTER_READ_SLAVE_RESPONSE_LOOP  ; goes back to read another character
 
-MASTER_ACK:                       ; sends ACK message to master's terminal
-    LDI  ZH, HIGH(2*MSG_ACK)      ;
-    LDI  ZL, LOW(2*MSG_ACK)       ;
-    CALL SEND_MSG_USART0          ;
-    JMP  MASTER_LOOP              ; returns to read another protocol
-
-MASTER_INVALID:                   ; sends INVALID message to master's terminal
-    LDI  ZH, HIGH(2*MSG_INVALID)  ;
-    LDI  ZL, LOW(2*MSG_INVALID)   ;
-    CALL SEND_MSG_USART0          ;
-    JMP  MASTER_LOOP              ; returns to read another protocol
+MASTER_END:
+    LDI  R16, ENTER_KEY           ; sends enter key to master's terminal
+    CALL USART0_TRANSMIT          ;
+    JMP  MASTER_LOOP              ; goes back to read another user's input
 
 SLAVE:                            ; slave's main function
     CALL TIMER1_INIT_MODE14       ; initializes timer
@@ -288,9 +290,18 @@ SLAVE_SUCCESS_READ_ENTER:         ; slave waits for enter key to execute a valid
     JMP  SLAVE_SUCCESS_READ_ENTER ; loops until master sends a enter key
 
 SLAVE_SUCCESS:                    ; executes a valid protocol and sends confirmation code to master
-    LDI  R16, ACK_CODE            ; sends ack code to master
+    LDI  R16, A_KEY               ; sends A to master
     CALL USART1_TRANSMIT          ;
-
+    
+    LDI  R16, C_KEY               ; sends C to master
+    CALL USART1_TRANSMIT          ;
+    
+    LDI  R16, K_KEY               ; sends K to master
+    CALL USART1_TRANSMIT          ;
+    
+    LDI  R16, LF_KEY              ; sends linefeed to master
+    CALL USART1_TRANSMIT          ;
+    
     CALL SLAVE_SEND_RECEIVED_MSG  ; sends master's protocol to slave's terminal
 
     CPI  R18, L_KEY               ; if first letter of valid protocol is "L", then execute led protocol
@@ -495,8 +506,30 @@ SLAVE_UNSUCCESS_READ_ENTER:          ; waits for master's enter key after a inva
     JMP  SLAVE_UNSUCCESS_READ_ENTER  ; loops until master sends a enter key
 
 SLAVE_UNSUCCESS:                     ; finishes a invalid protocol
-    LDI  R16, 0xff                   ; slave uses 0xff as invalid code
-    CALL USART1_TRANSMIT             ; sends invalid message to master
+    LDI  R16, I_KEY                  ; sends I to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, N_KEY                  ; sends N to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, V_KEY                  ; sends V to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, A_KEY                  ; sends A to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, L_KEY                  ; sends L to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, I_KEY                  ; sends I to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, D_KEY                  ; sends D to master
+    CALL USART1_TRANSMIT             ;
+    
+    LDI  R16, LF_KEY                 ; sends linefeed to master
+    CALL USART1_TRANSMIT             ;
+
     CALL SLAVE_SEND_RECEIVED_MSG     ; sends master's protocol to slave's terminal
     JMP  SLAVE_INIT_REGISTERS        ; goes back to read another input
 
@@ -664,7 +697,7 @@ USART1_INIT:
     LDI	R16, (1<<RXEN1)|(1<<TXEN1)   ; Enables RX and TX
 
     STS	UCSR1B, R16
-    LDI	R16, (0<<USBS1)|(3<<UCSZ01)  ; Frame: 8 data bits, 1 stop bit
+    LDI	R16, (1<<UCSZ11)|(1<<UCSZ10) ; Frame: 8 data bits, 1 stop bit
     STS	UCSR1C, R16                  ; No parity bit
     RET
 
@@ -822,10 +855,6 @@ MSG_MASTER:
    .DB "*** MASTER *** ", 0x0A, 0x0D, '$'
 MSG_SLAVE:
    .DB "*** SLAVE ***", 0x0A, 0x0D, '$'
-MSG_ACK:
-   .DB "ACK", 0x0A, 0x0D, '$'
-MSG_INVALID:
-   .DB "INVALID", 0x0A, 0x0D, '$'
 MSG_LF:
    .DB 0x0A, '$'
 
