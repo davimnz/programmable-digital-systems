@@ -850,7 +850,7 @@ TIMER1_INIT_MODE14:
 ;  Hard coded messages
 ;*********************************************************************
 MSG_HASH:
-   .DB "bb879094260615a56d2ff40f4152a8b79658acd5 ", '$'
+   .DB "583eea551e96204b4cebb99e619cc3d6698b800f ", '$'
 MSG_MASTER:
    .DB "*** MASTER *** ", 0x0A, 0x0D, '$'
 MSG_SLAVE:
