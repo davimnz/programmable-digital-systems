@@ -46,54 +46,76 @@ JMP256		MACRO
 	ORG	CODIGO
 
 INICIO:         LXI     SP,TOPO_RAM	; seta stack pointer para topo ram
-                CALL    INICIASIO       ; inicia uart
+                CALL    INICIASIO       ; inicia usart
 
-                LXI     H,MENSAGEM	; envia mensagem inicial para uart
+                LXI     H,MENSAGEM	; envia mensagem inicial para usart
                 CALL    DISPLAY		;
 
 
-LOOP:		CALL	INPUT		; le uma letra de entrada
+LOOP:		CALL	INPUT		; le caractere na usart
 
 		CPI	'z'             ; se for z, demonstra a instrucao FILLBLOCK
 		JZ	DEMO_FILLBLOCK  ;
-		JMP	LOOP            ; se nao for z, le outra letra
+		JMP	LOOP            ; se nao for z, le outro caractere
 
 
-DEMO_FILLBLOCK:	LXI	H, MENSAGEM_FILLBLOCK    ; mensagem de teste de fillblock
+
+DEMO_FILLBLOCK:	LXI	H, MENSAGEM_FILLBLOCK    ; imprime mensagem indicando teste FILLBLOCK
 		CALL	DISPLAY                  ; 
 
-CODE_FILLBLOCK:	LXI	B, 0050H
-		LXI	H, DADOS
-		MVI	A, 36H
+CODE_FILLBLOCK:	LXI	B, 0050H          	 ; serao preenchidos 0050H bytes
+		LXI	H, DADOS                 ; comeca o preenchimento em 0E000H, inicio RAM
+		MVI	A, 36H             	 ; dados preenchidos com o valor 36H
+		FILLBLOCK                        ;
 
-		FILLBLOCK
-
-END_FILLBLOCK:	CALL	INPUT
-		CPI	'z'
-		JZ	DEMO_MOVBLOCK
-		JMP	END_FILLBLOCK
-
-
-DEMO_MOVBLOCK:	LXI	H, MENSAGEM_MOVBLOCK
-		CALL	DISPLAY
-
-CODE_MOVBLOCK:
-
-END_MOVBLOCK:	CALL	INPUT
-		CPI	'z'
-		JZ	DEMO_LONGADD
-		JMP	END_MOVBLOCK
+END_FILLBLOCK:	CALL	INPUT                    ; le caractere na usart
+		CPI	'z'                      ; se for z, demonstra a instrucao LONGADD
+		JZ	DEMO_MOVBLOCK            ;
+		JMP	END_FILLBLOCK            ; se nao for z, le outro caractere
 
 
-DEMO_LONGADD:	LXI	H, MENSAGEM_LONGADD
-		CALL	DISPLAY
 
-CODE_LONGADD:
+DEMO_MOVBLOCK:	LXI	H, MENSAGEM_MOVBLOCK  ; imprime mensagem indicando teste MOVBLOCK
+		CALL	DISPLAY		      ;
 
-END_LONGADD:	CALL 	INPUT
-		CPI	'z'
-		JZ	DEMO_LONGSUB
-		JMP	END_LONGADD
+CODE_MOVBLOCK:	LXI	B, 0020H        ; serao copiados 0020H bytes
+		LXI	D, DADOS        ; dados copiados a partir de 0000H
+		LXI	H, DADOS+300H   ; dados colados a partir de 0300H
+		MOVBLOCK	        ; Mem[0300H..0320H] <-- Mem[0000H..0020H]
+
+END_MOVBLOCK:	CALL	INPUT		; le caractere na usart
+		CPI	'z'		; se for z, demonstra a instrucao LONGADD 
+		JZ	DEMO_LONGADD	;
+		JMP	END_MOVBLOCK    ; se nao for z, le outro caractere
+
+
+
+DEMO_LONGADD:	LXI	H, MENSAGEM_LONGADD  ; imprime mensagem indicando teste LONGADD
+		CALL	DISPLAY              ;
+
+CODE_LONGADD:	LXI	B, 8                 ; os numeros somados serao de 8 bytes
+		LXI	D, CONSTANTE1        ; D aponta para o inicio de CONSTANTE1
+		LXI	H, PARCELA1          ; H aponta para o inicio de PARCELA1
+		MOVBLOCK                     ; Mem[HL..HL+7] <-- Mem[DE..DE+7]
+
+		LXI	D, CONSTANTE2        ; D aponta para o inicio de CONSTANTE2
+		LXI	H, PARCELA2          ; H aponta para o inicio de PARCELA2
+		MOVBLOCK                     ; Mem[HL..HL+7] <-- Mem[DE..DE+7]
+
+		LXI	B, 8                 ; os numeros somados serao de 8 bytes
+		LXI	D, PARCELA1          ; armazena em D o endereco de inicio de PARCELA1 
+		LXI	H, PARCELA2          ; armazena em H o endereco de inicio de PARCELA2
+		
+		LONGADD			     ; Mem[HL..HL+7] <-- Mem[DE..DE+7] + Mem[HL..HL+7]
+
+CONSTANTE1:	DB	00H,00H,00H,00H,02H,00H,00H,01H  ; constantes usadas para somar
+CONSTANTE2:	DB	00H,00H,00H,00H,03H,01H,00H,04H  ;
+
+END_LONGADD:	CALL 	INPUT                ; le caractere na usart
+		CPI	'z'                  ; se for z, demonstra a instrucao LONGSUB
+		JZ	DEMO_LONGSUB         ;
+		JMP	END_LONGADD          ; se nao for z, le outro caractere
+
 
 
 DEMO_LONGSUB:	LXI	H, MENSAGEM_LONGSUB
@@ -106,10 +128,14 @@ END_LONGSUB:	CALL	INPUT
 		JZ	FIM_PROG
 		JMP	END_LONGSUB
 
+
+
 FIM_PROG:	LXI	H, MENSAGEM_FIM
 		CALL	DISPLAY
 
 END_LOOP:	JMP	END_LOOP
+
+
 
 ;****************************************************
 ;****************************************************
@@ -270,6 +296,10 @@ MENSAGEM_FIM:
 
 ;                               *
 ;********************************
+
+	ORG	DADOS+0100H
+PARCELA1:	DS	8
+PARCELA2:	DS	8
 
 
 ;       Final do segmento "CODIGO"                                   **
