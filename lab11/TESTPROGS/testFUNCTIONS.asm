@@ -118,22 +118,38 @@ END_LONGADD:	CALL 	INPUT                ; le caractere na usart
 
 
 
-DEMO_LONGSUB:	LXI	H, MENSAGEM_LONGSUB
-		CALL	DISPLAY
+DEMO_LONGSUB:	LXI	H, MENSAGEM_LONGSUB              ; imprime mensagem indicando teste LONGSUB       
+		CALL	DISPLAY                          ;
 
-CODE_LONGSUB:
+CODE_LONGSUB:	LXI	B, 8				 ; os numeros subtraidos serao de 8 bytes
+		LXI	D, CONSTANTE3			 ; D aponta para o inicio de CONSTANTE3
+		LXI	H, PARCELA3			 ; H aponta para o inicio de PARCELA3
+		MOVBLOCK				 ; Mem[HL..HL+7] <-- Mem[DE..DE+7]
 
-END_LONGSUB:	CALL	INPUT
-		CPI	'z'
-		JZ	FIM_PROG
-		JMP	END_LONGSUB
+		LXI	D, CONSTANTE4			 ; D aponta para o inicio de CONSTANTE4
+		LXI	H, PARCELA4			 ; H aponta para o inicio de PARCELA4
+		MOVBLOCK				 ; Mem[HL..HL+7] <-- Mem[DE..DE+7]
+
+		LXI	B, 8				 ; os numeros subtraidos serao de 8 bytes
+		LXI	D, PARCELA3			 ; armazena em D o endereco de inicio de PARCELA3
+		LXI	H, PARCELA4			 ; armazena em H o endereco de inicio de PARCELA4
+		
+		LONGSUB                                  ; Mem[HL..HL+7] <-- Mem[DE..DE+7] - Mem[HL..HL+7]
+
+CONSTANTE3:	DB	00H,00H,00H,00H,00H,11H,00H,11H  ; constantes usadas para subtrair
+CONSTANTE4:	DB	00H,00H,00H,00H,00H,00H,00H,11H  ;
+
+END_LONGSUB:	CALL	INPUT                            ; le caractere na usart
+		CPI	'z'                              ; se for z, entra em loop ate finalizar
+		JZ	FIM_PROG                         ;
+		JMP	END_LONGSUB                      ; se nao for z, le outro caractere
 
 
 
-FIM_PROG:	LXI	H, MENSAGEM_FIM
-		CALL	DISPLAY
+FIM_PROG:	LXI	H, MENSAGEM_FIM                  ; exibe mensagem de fim de programa
+		CALL	DISPLAY                          ;
 
-END_LOOP:	JMP	END_LOOP
+END_LOOP:	JMP	END_LOOP                         ; permanece em loop ate desligar a simulacao
 
 
 
@@ -300,6 +316,8 @@ MENSAGEM_FIM:
 	ORG	DADOS+0100H
 PARCELA1:	DS	8
 PARCELA2:	DS	8
+PARCELA3:	DS	8
+PARCELA4:	DS	8
 
 
 ;       Final do segmento "CODIGO"                                   **
