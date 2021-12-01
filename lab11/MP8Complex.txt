@@ -1294,28 +1294,31 @@ I_LONGSUB:	{EK,LXH}                    // carrega 00H em XH
 		{}  JMP_XZERO FIM_LONGSUB   // avanca para fim se X for zero
 
 // Efetua Y <-- DE, Z <-- HL
-		{EDEHD,LYH}
-		{EDELD,LYL}
-		{EHLHD,LZH}
-		{EHLLD,LZL}
+
+		{EDEHD,LYH}                 // carrega D na parte alta de Y
+		{EDELD,LYL}                 // carrega E na parte baixa de Y
+		{EHLHD,LZH}                 // carrega H na parte alta de Z
+		{EHLLD,LZL}                 // carrega L na parte baixa de Z
 
 // Desloca Y de X-1 para apontar para digito menos significativo
-		{EXLD,LT1}
-		{EYLD,LT2}
-		{ET1ULA,ET2ULA,EULA,LYL,LCARRY}
-		{EXHD,LT1}
-		{EYHD,LT2}
-		{ET1ULA,ET2ULA,OP0,EULA,LYH}
-		{DECY}
+
+		{EXLD,LT1}                       // carrega XL em T1
+		{EYLD,LT2}                       // carrega YL em T2
+		{ET1ULA,ET2ULA,EULA,LYL,LCARRY}  // carrega T1 + T2 em YL 
+		{EXHD,LT1}                       // carrega XH em T1
+		{EYHD,LT2}                       // carrega YH em T2
+		{ET1ULA,ET2ULA,OP0,EULA,LYH}     // carrega T1 + T2 + carry em YH
+		{DECY}                           // decrementa registrador Y  
 
 // Desloca Z de X-1 para apontar para digito menos significativo
-		{EXLD,LT1}
-		{EZLD,LT2}
-		{ET1ULA,ET2ULA,EULA,LZL,LCARRY}
-		{EXHD,LT1}
-		{EZHD,LT2}
-		{ET1ULA,ET2ULA,OP0,EULA,LZH}
-		{DECZ}
+
+		{EXLD,LT1}                       // carrega XL em T1
+		{EZLD,LT2}                       // carrega ZL em T2
+		{ET1ULA,ET2ULA,EULA,LZL,LCARRY}  // carrega T1 + T2 em ZL
+		{EXHD,LT1}                       // carrega XH em T1
+		{EZHD,LT2}                       // carrega ZH em T2
+		{ET1ULA,ET2ULA,OP0,EULA,LZH}     // carrega T1 + T2 + carry em ZH
+		{DECZ}                           // decrementa registrador Z
 
 // Efetua loop da subtracao
 		{CLEARCARRY}                              // elimina qualquer carry

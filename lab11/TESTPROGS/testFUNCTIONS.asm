@@ -1,3 +1,26 @@
+;*************************************************************************
+; testFUNCTIONS.ASM                                                      *
+;    Programa teste para as quatros instrucoes:                          *
+;    	1. FILLBLOCK							 *
+;       2. MOVBLOCK                                                      *
+;	3. LONGADD                                                       *
+;       4. LONGSUB                                                       *
+;                                                                        *
+;    O programa assume um hardware dotado dos seguintes elementos:       *
+;                                                                        *
+;    - Processador MP8 (8080/8085 simile);                               *
+;    - ROM de 0000H a 1FFFh;                                             *
+;    - RAM de E000h a FFFFh;                                             *
+;    - UART 8250A vista nos enderecos 08H a 0Fh;                         *
+;    - PIO de entrada vista no endereço 00h;                             *
+;    - PIO de saída vista no endereço 00h.                               *
+;                                                                        *
+;    Para compilar e "linkar" o programa, pode ser usado o assembler     *
+;    "zmac", com a linha de comando:                                     *
+;                                                                        *
+;         "zmac -8 --oo lst,hex testFUNCTIONS.asm".                      *
+;*************************************************************************
+
 ; Define origem da ROM e da RAM (este programa tem dois segmentos).
 ; Diretivas nao podem comecar na primeira coluna.
 
@@ -319,10 +342,5 @@ PARCELA2:	DS	8
 PARCELA3:	DS	8
 PARCELA4:	DS	8
 
+	END 	INICIO
 
-;       Final do segmento "CODIGO"                                   **
-;                                                                    **
-;**********************************************************************
-;**********************************************************************
-
-        END	INICIO
